@@ -5,12 +5,7 @@ The latter is achieved by compiling the project once and observing which files a
 Due to the reliance on `inotify`, this tool is currently available only for Linux.
 
 ## Installation
-First, install `inotify`
-```bash
-sudo apt install inotify-tools 
-```
-
-Afterwards, install `arxify` via 
+Install `arxify` via 
 ```bash
 pip install arxify
 ```
