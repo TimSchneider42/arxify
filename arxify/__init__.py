@@ -1,1 +1,1 @@
-from arxify import *
+from arxify.arxify import main
