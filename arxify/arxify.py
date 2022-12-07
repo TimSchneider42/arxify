@@ -4,7 +4,6 @@ import re
 import shutil
 import subprocess
 import sys
-
 from itertools import chain
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -63,7 +62,8 @@ def main():
                         help="Compiler used to compile the project.")
     parser.add_argument("-b", "--bibliography-processor", choices=["bibtex", "biber"], default="bibtex",
                         help="Which program to use for processing the bibliography.")
-    parser.add_argument("-i", "--include", nargs="+", help="Include these files, whether they are needed or not.")
+    parser.add_argument("-i", "--include", nargs="+", default=(),
+                        help="Include these files, whether they are needed or not.")
     parser.add_argument(
         "-r", "--root", type=str, help="Root directory of the project (default: parent of the main tex file).")
     args = parser.parse_args()
@@ -126,9 +126,7 @@ def main():
 
         shutil.copy(latex_out / "{}.bbl".format(main_tex_file_rel.stem), zip_path)
 
-        cmd = ["zip", "-r", str(Path(args.output_filename).resolve()), "."]
-
-        subprocess.check_call(cmd, cwd=zip_path)
+        shutil.make_archive(str(Path(args.output_filename).resolve()), "zip", zip_path)
 
 
 if __name__ == "__main__":
