@@ -58,10 +58,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("main_tex_file", type=str, help="Main tex file of the project.")
     parser.add_argument("output_filename", type=str, help="Filename of the output *.zip file.")
-    parser.add_argument("-c", "--compiler", choices=["lualatex", "pdflatex"], default="pdflatex",
-                        help="Compiler used to compile the project.")
+    parser.add_argument("-c", "--compiler", choices=["pdflatex", "lualatex"], default="pdflatex",
+                        help="Compiler used to compile the project (default: pdflatex).")
     parser.add_argument("-b", "--bibliography-processor", choices=["bibtex", "biber"], default="bibtex",
-                        help="Which program to use for processing the bibliography.")
+                        help="Which program to use for processing the bibliography (default: bibtex).")
     parser.add_argument("-i", "--include", nargs="+", default=(),
                         help="Include these files, whether they are needed or not.")
     parser.add_argument(
