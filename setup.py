@@ -5,7 +5,7 @@ with open("README.md", "r") as f:
 
 setup(
     name="arxify",
-    version="1.0.1",
+    version="1.0.2",
     description="Pack a latex project into an arxiv compatible archive.",
     long_description=long_description,
     long_description_content_type="text/markdown",

@@ -21,7 +21,7 @@ def find_files(root: Path) -> List[Path]:
 
 
 def remove_comment(line: str):
-    results = re.findall("((?:[^%]|%%)*%?).*", line)[:-1]
+    results = re.findall("((?:[^%]|\\%)*%?).*", line)[:-1]
     if len(results) == 0:
         return ""
     return results[0]
