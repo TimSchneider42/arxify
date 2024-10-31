@@ -85,6 +85,8 @@ def main():
 
         print("Copying files to temporary directory...")
         shutil.copytree(root, tmp_root)
+        for f in tmp_root.glob("**/*.bst"):
+            shutil.copy(f, latex_out / f.relative_to(tmp_root))
         print("Done copying files.")
 
         additional_files = [(f if f.is_absolute() else root / f).resolve() for f in map(Path, args.include)]
