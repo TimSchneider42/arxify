@@ -128,7 +128,10 @@ def main():
 
         shutil.copy(latex_out / "{}.bbl".format(main_tex_file_rel.stem), zip_path)
 
-        shutil.make_archive(str(Path(args.output_filename).resolve()), "zip", zip_path)
+        output_path = Path(args.output_filename).resolve()
+        if output_path.suffix == ".zip":
+            output_path = output_path.with_suffix("")
+        shutil.make_archive(str(output_path), "zip", zip_path)
 
 
 if __name__ == "__main__":
