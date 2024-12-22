@@ -21,10 +21,10 @@ def find_files(root: Path) -> List[Path]:
 
 
 def remove_comment(line: str):
-    results = re.findall("((?:[^%]|\\%)*%?).*", line)[:-1]
+    results = re.findall(r"((?:\\%|[^%])*)%?.*", line)[:-1]
     if len(results) == 0:
         return ""
-    return results[0]
+    return results[0].rstrip()
 
 
 def process_tex_file(path: Path) -> str:
