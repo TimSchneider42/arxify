@@ -15,7 +15,7 @@ setup(
     license="MIT",
     packages=find_packages(),
     install_requires=[
-        "inotify==0.2.10"
+        "watchdog"
     ],
     classifiers=[
         "Intended Audience :: Science/Research",

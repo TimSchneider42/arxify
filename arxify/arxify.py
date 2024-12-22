@@ -9,9 +9,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import List, Set
 
-import inotify.adapters
-import inotify.calls
-import inotify.constants
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
 
 def find_files(root: Path) -> List[Path]:
@@ -36,22 +35,36 @@ def process_tex_file(path: Path) -> str:
     return "\n".join(lines_filtered)
 
 
+class FileOpenHandler(FileSystemEventHandler):
+    def __init__(self, opened_files: Set[Path]):
+        self.opened_files = opened_files
+
+    def on_opened(self, event):
+        if not event.is_directory:
+            self.opened_files.add(Path(event.src_path))
+
+
 def find_required_files(root: Path, main_tex_file_rel: Path, latex_out: Path, compiler: str = "pdflatex") -> Set[Path]:
-    i = inotify.adapters.InotifyTree(str(root))
+    opened_files = set()
 
-    proc = subprocess.Popen([compiler, "-output-directory", str(latex_out), str(main_tex_file_rel)], cwd=root)
+    # Set up the watchdog observer and event handler
+    event_handler = FileOpenHandler(opened_files)
+    observer = Observer()
+    observer.schedule(event_handler, str(root), recursive=True)
 
-    opened_files = []
-    while proc.poll() is None:
-        for event in i.event_gen(yield_nones=False, timeout_s=1.0):
-            (_, type_names, path, filename) = event
-            if "IN_ISDIR" not in type_names:
-                opened_files.append(Path(path) / filename)
-    for event in i.event_gen(yield_nones=False, timeout_s=0.0):
-        (_, type_names, path, filename) = event
-        if "IN_ISDIR" not in type_names:
-            opened_files.append(Path(path) / filename)
-    return set(opened_files)
+    # Start observing
+    observer.start()
+
+    try:
+        # Run the LaTeX compiler
+        proc = subprocess.Popen([compiler, "-output-directory", str(latex_out), str(main_tex_file_rel)], cwd=root)
+        proc.wait()
+    finally:
+        # Stop observing
+        observer.stop()
+        observer.join()
+
+    return opened_files
 
 
 def main():
