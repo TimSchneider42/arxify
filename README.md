@@ -1,8 +1,7 @@
 # arxify - Arxiv Packaging Tool
 `arxify` is a command line tool that packages latex projects into an arXiv-compatible archives.
 It removes comments from you *.tex files and removes any files that are not needed during the compile process.
-The latter is achieved by compiling the project once and observing which files are being accessed by the compiler using `inotify`.
-Due to the reliance on `inotify`, this tool is currently available only for Linux.
+The latter is achieved by compiling the project once and observing which files are being accessed by the compiler using [watchdog](https://github.com/gorakhargosh/watchdog).
 
 ## Installation
 Install `arxify` via 
