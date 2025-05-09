@@ -20,25 +20,27 @@ def find_files(root: Path) -> List[Path]:
 
 
 def remove_comment(line: str):
-    match = re.search(r'(?<!\\)%', line)
+    match = re.search(r"(?<!\\)%", line)
     if match:
-        return line[:match.start()]
+        return line[: match.start()]
     else:
         return line
 
 
 def remove_tikz_externalize(tex_code: str) -> str:
     if "\\usetikzlibrary" in tex_code:
-        packages = re.findall(r'\\usetikzlibrary{([^,}]*)(?:,([^,}]*))*}', tex_code)[0]
-        packages_filtered = [p for p in packages if p.strip() != "external" and p.strip() != ""]
+        packages = re.findall(r"\\usetikzlibrary{([^,}]*)(?:,([^,}]*))*}", tex_code)[0]
+        packages_filtered = [
+            p for p in packages if p.strip() != "external" and p.strip() != ""
+        ]
         if len(packages_filtered) == 0:
             replacement = ""
         else:
             replacement = "\\usetikzlibrary{" + ",".join(packages_filtered) + "}"
-        tex_code = re.sub(r'\\usetikzlibrary{[^}]*?}', lambda m: replacement, tex_code)
+        tex_code = re.sub(r"\\usetikzlibrary{[^}]*?}", lambda m: replacement, tex_code)
     if "\\tikzexternalize" in tex_code:
         # Remove tikzexternalize commands
-        tex_code = re.sub(r'\\tikzexternalize(\[[^]]*\])?({})?', "", tex_code)
+        tex_code = re.sub(r"\\tikzexternalize(\[[^]]*\])?({})?", "", tex_code)
     return tex_code
 
 
@@ -47,7 +49,11 @@ def process_tex_file(path: Path) -> str:
         tex_code = f.read()
     lines = tex_code.split("\n")
     # Remove all comments and disable tikz externalize if enabled
-    lines_filtered = [remove_tikz_externalize(remove_comment(l)) for l in lines if not l.strip().startswith("%")]
+    lines_filtered = [
+        remove_tikz_externalize(remove_comment(l))
+        for l in lines
+        if not l.strip().startswith("%")
+    ]
     return "\n".join(lines_filtered)
 
 
@@ -60,7 +66,9 @@ class FileOpenHandler(FileSystemEventHandler):
             self.opened_files.add(Path(event.src_path))
 
 
-def find_required_files(root: Path, main_tex_file_rel: Path, latex_out: Path, compiler: str = "pdflatex") -> Set[Path]:
+def find_required_files(
+    root: Path, main_tex_file_rel: Path, latex_out: Path, compiler: str = "pdflatex"
+) -> Set[Path]:
     opened_files = set()
 
     # Set up the watchdog observer and event handler
@@ -73,7 +81,10 @@ def find_required_files(root: Path, main_tex_file_rel: Path, latex_out: Path, co
 
     try:
         # Run the LaTeX compiler
-        proc = subprocess.Popen([compiler, "-output-directory", str(latex_out), str(main_tex_file_rel)], cwd=root)
+        proc = subprocess.Popen(
+            [compiler, "-output-directory", str(latex_out), str(main_tex_file_rel)],
+            cwd=root,
+        )
         proc.wait()
     finally:
         # Stop observing
@@ -86,15 +97,36 @@ def find_required_files(root: Path, main_tex_file_rel: Path, latex_out: Path, co
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("main_tex_file", type=str, help="Main tex file of the project.")
-    parser.add_argument("output_filename", type=str, help="Filename of the output *.zip file.")
-    parser.add_argument("-c", "--compiler", choices=["pdflatex", "lualatex"], default="pdflatex",
-                        help="Compiler used to compile the project (default: pdflatex).")
-    parser.add_argument("-b", "--bibliography-processor", choices=["bibtex", "biber"], default="bibtex",
-                        help="Which program to use for processing the bibliography (default: bibtex).")
-    parser.add_argument("-i", "--include", nargs="+", default=(),
-                        help="Include these files, whether they are needed or not.")
     parser.add_argument(
-        "-r", "--root", type=str, help="Root directory of the project (default: parent of the main tex file).")
+        "output_filename", type=str, help="Filename of the output *.zip file."
+    )
+    parser.add_argument(
+        "-c",
+        "--compiler",
+        choices=["pdflatex", "lualatex"],
+        default="pdflatex",
+        help="Compiler used to compile the project (default: pdflatex).",
+    )
+    parser.add_argument(
+        "-b",
+        "--bibliography-processor",
+        choices=["bibtex", "biber"],
+        default="bibtex",
+        help="Which program to use for processing the bibliography (default: bibtex).",
+    )
+    parser.add_argument(
+        "-i",
+        "--include",
+        nargs="+",
+        default=(),
+        help="Include these files, whether they are needed or not.",
+    )
+    parser.add_argument(
+        "-r",
+        "--root",
+        type=str,
+        help="Root directory of the project (default: parent of the main tex file).",
+    )
     args = parser.parse_args()
 
     main_tex_file = Path(args.main_tex_file).resolve()
@@ -118,14 +150,23 @@ def main():
             shutil.copy(f, latex_out / f.relative_to(tmp_root))
         print("Done copying files.")
 
-        additional_files = [(f if f.is_absolute() else root / f).resolve() for f in map(Path, args.include)]
+        additional_files = [
+            (f if f.is_absolute() else root / f).resolve()
+            for f in map(Path, args.include)
+        ]
         additional_files_tmp = []
         for f in additional_files:
             if root not in f.parents:
-                sys.stderr.write("Manually included file {} is not in a subdirectory of {}.".format(f, root))
+                sys.stderr.write(
+                    "Manually included file {} is not in a subdirectory of {}.".format(
+                        f, root
+                    )
+                )
                 exit(1)
             if not f.exists():
-                sys.stderr.write("Manually included file {} does not exist.".format(f, root))
+                sys.stderr.write(
+                    "Manually included file {} does not exist.".format(f, root)
+                )
                 exit(1)
             new_path = tmp_root / f.relative_to(root)
             shutil.copy(f, new_path)
@@ -138,15 +179,22 @@ def main():
                 f.write(new_content)
         print("Done stripping comments.")
 
-        required_files = find_required_files(tmp_root, main_tex_file_rel, latex_out, compiler=args.compiler)
+        required_files = find_required_files(
+            tmp_root, main_tex_file_rel, latex_out, compiler=args.compiler
+        )
         required_files.update(additional_files_tmp)
 
         if args.bibliography_processor == "biber":
-            subprocess.check_call(["biber", "--input-directory", str(root), main_tex_file_rel.stem],
-                                  cwd=latex_out)
+            subprocess.check_call(
+                ["biber", "--input-directory", str(root), main_tex_file_rel.stem],
+                cwd=latex_out,
+            )
         else:
-            subprocess.check_call([args.bibliography_processor, main_tex_file_rel.stem], cwd=latex_out,
-                                  env={"BIBINPUTS": str(root), **os.environ})
+            subprocess.check_call(
+                [args.bibliography_processor, main_tex_file_rel.stem],
+                cwd=latex_out,
+                env={"BIBINPUTS": str(root), **os.environ},
+            )
 
         print("The following files will be included in the zip:")
         for tf in required_files:
