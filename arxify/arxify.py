@@ -20,11 +20,11 @@ def find_files(root: Path) -> List[Path]:
 
 
 def remove_comment(line: str):
-    results = re.findall(r"((?:\\%|[^%])*)%?.*", line)[:-1]
-    if len(results) == 0:
-        return ""
-    return results[0].rstrip()
-
+    match = re.search(r'(?<!\\)%', line)
+    if match:
+        return line[:match.start()]
+    else:
+        return line
 
 def remove_tikz_externalize(tex_code: str) -> str:
     if "\\usetikzlibrary" in tex_code:
