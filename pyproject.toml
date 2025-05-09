@@ -1,0 +1,27 @@
+[project]
+name = "arxify"
+version = "1.2.0"
+description = "Pack a latex project into an arxiv compatible archive."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Tim Schneider", email = "tim@robot-learning.de" },
+]
+urls = { Homepage = "https://github.com/TimSchneider42/arxify" }
+dependencies = [
+    "watchdog"
+]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.10"
+]
+
+[project.scripts]
+arxify = "arxify:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
