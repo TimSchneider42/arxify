@@ -26,12 +26,27 @@ def remove_comment(line: str):
     return results[0].rstrip()
 
 
+def remove_tikz_externalize(tex_code: str) -> str:
+    if "\\usetikzlibrary" in tex_code:
+        packages = re.findall(r'\\usetikzlibrary{([^,}]*)(?:,([^,}]*))*}', tex_code)[0]
+        packages_filtered = [p for p in packages if p.strip() != "external" and p.strip() != ""]
+        if len(packages_filtered) == 0:
+            replacement = ""
+        else:
+            replacement = "\\usetikzlibrary{" + ",".join(packages_filtered) + "}"
+        tex_code = re.sub(r'\\usetikzlibrary{[^}]*?}', lambda m: replacement, tex_code)
+    if "\\tikzexternalize" in tex_code:
+        # Remove tikzexternalize commands
+        tex_code = re.sub(r'\\tikzexternalize(\[[^]]*\])?({})?', "", tex_code)
+    return tex_code
+
+
 def process_tex_file(path: Path) -> str:
     with path.open() as f:
         tex_code = f.read()
     lines = tex_code.split("\n")
-    # Remove all comments
-    lines_filtered = [remove_comment(l) for l in lines if not l.strip().startswith("%")]
+    # Remove all comments and disable tikz externalize if enabled
+    lines_filtered = [remove_tikz_externalize(remove_comment(l)) for l in lines if not l.strip().startswith("%")]
     return "\n".join(lines_filtered)
 
 
@@ -115,6 +130,13 @@ def main():
             shutil.copy(f, new_path)
             additional_files_tmp.append(new_path)
 
+        print("Stripping comments of tex files and disabling tikzexternalize...")
+        for tf in tmp_root.rglob("*.tex"):
+            new_content = process_tex_file(tf)
+            with tf.open("w") as f:
+                f.write(new_content)
+        print("Done stripping comments.")
+
         required_files = find_required_files(tmp_root, main_tex_file_rel, latex_out, compiler=args.compiler)
         required_files.update(additional_files_tmp)
 
@@ -132,11 +154,7 @@ def main():
         for tf in required_files:
             output_path = zip_path / tf.relative_to(tmp_root)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            if tf.suffix == ".tex":
-                new_content = process_tex_file(tf)
-                with output_path.open("w") as f:
-                    f.write(new_content)
-            elif tf.suffix != ".bib":
+            if tf.suffix != ".bib":
                 shutil.copy(tf, output_path)
 
         shutil.copy(latex_out / "{}.bbl".format(main_tex_file_rel.stem), zip_path)
