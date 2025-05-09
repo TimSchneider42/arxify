@@ -26,20 +26,6 @@ def remove_comment(line: str):
     else:
         return line
 
-def remove_tikz_externalize(tex_code: str) -> str:
-    if "\\usetikzlibrary" in tex_code:
-        packages = re.findall(r'\\usetikzlibrary{([^,}]*)(?:,([^,}]*))*}', tex_code)[0]
-        packages_filtered = [p for p in packages if p.strip() != "external" and p.strip() != ""]
-        if len(packages_filtered) == 0:
-            replacement = ""
-        else:
-            replacement = "\\usetikzlibrary{" + ",".join(packages_filtered) + "}"
-        tex_code = re.sub(r'\\usetikzlibrary{[^}]*?}', lambda m: replacement, tex_code)
-    if "\\tikzexternalize" in tex_code:
-        # Remove tikzexternalize commands
-        tex_code = re.sub(r'\\tikzexternalize(\[[^]]*\])?({})?', "", tex_code)
-    return tex_code
-
 
 def remove_tikz_externalize(tex_code: str) -> str:
     if "\\usetikzlibrary" in tex_code:
