@@ -9,6 +9,7 @@ import sys
 from itertools import chain
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Iterable
 
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
@@ -28,33 +29,12 @@ def remove_comment(line: str):
         return line
 
 
-def remove_tikz_externalize(tex_code: str) -> str:
-    if "\\usetikzlibrary" in tex_code:
-        packages = re.findall(r"\\usetikzlibrary{([^,}]*)(?:,([^,}]*))*}", tex_code)[0]
-        packages_filtered = [
-            p for p in packages if p.strip() != "external" and p.strip() != ""
-        ]
-        if len(packages_filtered) == 0:
-            replacement = ""
-        else:
-            replacement = "\\usetikzlibrary{" + ",".join(packages_filtered) + "}"
-        tex_code = re.sub(r"\\usetikzlibrary{[^}]*?}", lambda m: replacement, tex_code)
-    if "\\tikzexternalize" in tex_code:
-        # Remove tikzexternalize commands
-        tex_code = re.sub(r"\\tikzexternalize(\[[^]]*\])?({})?", "", tex_code)
-    return tex_code
-
-
 def process_tex_file(path: Path) -> str:
     with path.open() as f:
         tex_code = f.read()
     lines = tex_code.split("\n")
     # Remove all comments and disable tikz externalize if enabled
-    lines_filtered = [
-        remove_tikz_externalize(remove_comment(l))
-        for l in lines
-        if not l.strip().startswith("%")
-    ]
+    lines_filtered = [remove_comment(l) for l in lines if not l.strip().startswith("%")]
     return "\n".join(lines_filtered)
 
 
@@ -67,8 +47,12 @@ class FileOpenHandler(FileSystemEventHandler):
             self.opened_files.add(Path(event.src_path))
 
 
-def find_required_files(
-    root: Path, main_tex_file_rel: Path, latex_out: Path, compiler: str = "pdflatex"
+def compile_and_find_required_files(
+    root: Path,
+    main_tex_file_rel: Path,
+    latex_out: Path,
+    compiler: str = "pdflatex",
+    shell_escape: bool = False,
 ) -> set[Path]:
     opened_files = set()
 
@@ -82,17 +66,43 @@ def find_required_files(
 
     try:
         # Run the LaTeX compiler
-        proc = subprocess.Popen(
-            [compiler, "-output-directory", str(latex_out), str(main_tex_file_rel)],
+        subprocess.check_call(
+            [
+                compiler,
+                *(["--shell-escape"] if shell_escape else []),
+                "--interaction=nonstopmode",
+                "--halt-on-error",
+                "--output-directory",
+                str(latex_out),
+                str(main_tex_file_rel),
+            ],
             cwd=root,
         )
-        proc.wait()
     finally:
         # Stop observing
         observer.stop()
         observer.join()
 
     return opened_files
+
+
+def find_tikz_externalize_dirs(search_files: Iterable[Path]) -> list[Path]:
+    output = []
+    for f in search_files:
+        if f.suffix == ".tex":
+            matches = re.findall(
+                r"\\tikzexternalize\[(?:.*,)?prefix=([^,\]]+)(?:,.*)?]", f.read_text()
+            )
+            output += [Path(match) for match in matches]
+    return output
+
+
+def copy_dirs(src: Path, dst: Path):
+    for item in src.iterdir():
+        if item.is_dir():
+            new_dst = dst / item.name
+            new_dst.mkdir(exist_ok=True)
+            copy_dirs(item, new_dst)
 
 
 def main():
@@ -128,6 +138,11 @@ def main():
         type=str,
         help="Root directory of the project (default: parent of the main tex file).",
     )
+    parser.add_argument(
+        "--shell-escape",
+        action="store_true",
+        help="Enable shell escape for the LaTeX compiler.",
+    )
     args = parser.parse_args()
 
     main_tex_file = Path(args.main_tex_file).resolve()
@@ -143,14 +158,13 @@ def main():
         tmp_root = td_path / "root"
         latex_out = td_path / "out"
         zip_path = td_path / "zip"
-        latex_out.mkdir()
+        latex_out.mkdir()  # Copy all directories as tikz externalize might need one of them
 
         print("Copying files to temporary directory...")
         shutil.copytree(root, tmp_root)
-        for f in tmp_root.glob("**/*.bst"):
-            shutil.copy(f, latex_out / f.relative_to(tmp_root))
         print("Done copying files.")
 
+        copy_dirs(tmp_root, latex_out)
         additional_files = [
             (f if f.is_absolute() else root / f).resolve()
             for f in map(Path, args.include)
@@ -180,9 +194,45 @@ def main():
                 f.write(new_content)
         print("Done stripping comments.")
 
-        required_files = find_required_files(
-            tmp_root, main_tex_file_rel, latex_out, compiler=args.compiler
+        # Pass 1
+        print("Compiling LaTeX files...")
+        required_files_1 = compile_and_find_required_files(
+            tmp_root,
+            main_tex_file_rel,
+            latex_out,
+            compiler=args.compiler,
+            shell_escape=args.shell_escape,
         )
+        tikz_externalize_dirs = find_tikz_externalize_dirs(required_files_1)
+        print("Done compiling LaTeX files.")
+
+        if len(tikz_externalize_dirs) == 0:
+            required_files = required_files_1
+        else:
+            print(
+                f"Found tikz externalize directories: {', '.join(map(str, tikz_externalize_dirs))}."
+            )
+            print(
+                "Compiling LaTeX for the second time to include tikz externalize files..."
+            )
+
+            new_out_path = td_path / "new_out"
+            for d in tikz_externalize_dirs:
+                shutil.copytree(latex_out / d, new_out_path / d)
+
+            # Pass 2 to include tikz externalized files
+            shutil.rmtree(latex_out)
+            shutil.move(new_out_path, latex_out)
+            copy_dirs(tmp_root, latex_out)
+            required_files = compile_and_find_required_files(
+                tmp_root,
+                main_tex_file_rel,
+                latex_out,
+                compiler=args.compiler,
+                shell_escape=args.shell_escape,
+            )
+            print("Done compiling LaTeX files.")
+
         required_files.update(additional_files_tmp)
 
         if args.bibliography_processor == "biber":
@@ -194,17 +244,15 @@ def main():
             subprocess.check_call(
                 [args.bibliography_processor, main_tex_file_rel.stem],
                 cwd=latex_out,
-                env={"BIBINPUTS": str(root), **os.environ},
+                env={"BIBINPUTS": str(root), "BSTINPUTS": str(root), **os.environ},
             )
 
-        print("The following files will be included in the zip:")
-        for tf in required_files:
-            print("  {}".format(tf.relative_to(tmp_root)))
-
+        print("The following files will be included in the zip archive:")
         for tf in required_files:
             output_path = zip_path / tf.relative_to(tmp_root)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            if tf.suffix != ".bib":
+            if tf.suffix != ".bib" and tf.exists():
+                print("  {}".format(tf.relative_to(tmp_root)))
                 shutil.copy(tf, output_path)
 
         shutil.copy(latex_out / "{}.bbl".format(main_tex_file_rel.stem), zip_path)
