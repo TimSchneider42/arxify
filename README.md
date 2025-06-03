@@ -4,7 +4,7 @@ It removes comments from you *.tex files and removes any files that are not need
 The latter is achieved by compiling the project once and observing which files are being accessed by the compiler using [watchdog](https://github.com/gorakhargosh/watchdog).
 
 ## Installation
-Install `arxify` via 
+Install `arxify` via
 ```bash
 pip install arxify
 ```
@@ -21,7 +21,7 @@ Should that not be the case, specify the root directory with the `-r` option:
 arxify /path/to/root/subdir/main.tex /path/to/output.zip -r /path/to/root/
 ```
 
-By default `arxify` will attempt to compile your project using `pdflatex` and `bibtex`. 
+By default `arxify` will attempt to compile your project using `pdflatex` and `bibtex`.
 Currently supported are also `lualatex` and `biber`, which can be selected via
 ```bash
 arxify /path/to/root/main.tex /path/to/output.zip -c lualatex -b biber
