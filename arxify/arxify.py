@@ -235,27 +235,42 @@ def main():
 
         required_files.update(additional_files_tmp)
 
-        if args.bibliography_processor == "biber":
-            subprocess.check_call(
-                ["biber", "--input-directory", str(root), main_tex_file_rel.stem],
-                cwd=latex_out,
+        bib_files = [
+            str(path.relative_to(latex_out).with_suffix(""))
+            for path in latex_out.rglob("*.aux")
+            if any(
+                re.match(r"\\bib(style|data)\{[^}]*}", l)
+                for l in path.read_text().splitlines()
             )
-        else:
-            subprocess.check_call(
-                [args.bibliography_processor, main_tex_file_rel.stem],
-                cwd=latex_out,
-                env={"BIBINPUTS": str(root), "BSTINPUTS": str(root), **os.environ},
-            )
+        ]
 
-        print("The following files will be included in the zip archive:")
-        for tf in required_files:
+        for bib_file in bib_files:
+            if args.bibliography_processor == "biber":
+                subprocess.check_call(
+                    ["biber", "--input-directory", str(root), bib_file],
+                    cwd=latex_out,
+                )
+            else:
+                subprocess.check_call(
+                    [args.bibliography_processor, bib_file],
+                    cwd=latex_out,
+                    env={
+                        "BIBINPUTS": f"{root}:{os.environ.get('BIBINPUTS', '')}",
+                        "BSTINPUTS": f"{root}:{os.environ.get('BSTINPUTS', '')}",
+                        **os.environ,
+                    },
+                )
+
+        print("The following source files will be included in the zip archive:")
+        for tf in sorted(required_files):
             output_path = zip_path / tf.relative_to(tmp_root)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             if tf.suffix != ".bib" and tf.exists():
                 print("  {}".format(tf.relative_to(tmp_root)))
                 shutil.copy(tf, output_path)
 
-        shutil.copy(latex_out / "{}.bbl".format(main_tex_file_rel.stem), zip_path)
+        for bib_file in bib_files:
+            shutil.copy(latex_out / f"{bib_file}.bbl", zip_path / f"{bib_file}.bbl")
 
         output_path = Path(args.output_filename).resolve()
         if output_path.suffix == ".zip":
