@@ -216,13 +216,12 @@ def main():
                 "Compiling LaTeX for the second time to include tikz externalize files..."
             )
 
-            new_out_path = td_path / "new_out"
             for d in tikz_externalize_dirs:
-                shutil.copytree(latex_out / d, new_out_path / d)
+                shutil.copytree(latex_out / d, tmp_root / d, dirs_exist_ok=True)
 
             # Pass 2 to include tikz externalized files
             shutil.rmtree(latex_out)
-            shutil.move(new_out_path, latex_out)
+            latex_out.mkdir()
             copy_dirs(tmp_root, latex_out)
             required_files = compile_and_find_required_files(
                 tmp_root,
